@@ -12,8 +12,6 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      LOVE_VERSION: "11.5"
-      LOVEJS_VERSION: "master"   # или укажи конкретный тег, напр. "v11.5"
       GAME_NAME: "Balatro"
 
     steps:
@@ -30,11 +28,11 @@ jobs:
             zip unzip \
             wget curl
 
-      # ── 3. Emscripten (нужен love.js) ──────────────────────────────
+      # ── 3. Emscripten ──────────────────────────────────────────────
       - name: Set up Emscripten
         uses: mymindstorm/setup-emsdk@v14
         with:
-          version: "3.1.56"   # версия, с которой love.js собран; меняй при необходимости
+          version: "3.1.56"
           actions-cache-folder: emsdk-cache
 
       # ── 4. Клонируем love.js ───────────────────────────────────────
@@ -43,12 +41,12 @@ jobs:
           git clone --depth 1 \
             https://github.com/Davidobot/love.js.git \
             lovejs
+          echo "=== lovejs root ==="
+          ls lovejs/
 
       # ── 5. Упаковываем игру в .love-архив ─────────────────────────
       - name: Package game as .love
         run: |
-          # Собираем всё в корне репо в архив .love
-          # (формат .love = обычный zip с main.lua в корне)
           cd "$GITHUB_WORKSPACE"
           zip -9 -r "game.love" . \
             --exclude ".git/*" \
@@ -61,12 +59,25 @@ jobs:
       # ── 6. Собираем веб-билд через love.js ────────────────────────
       - name: Build web with love.js
         run: |
-          cd lovejs
-          python3 love.py \
-            "../game.love" \
-            "../web-build" \
+          # Ищем точку входа — в разных версиях репо имя скрипта отличается
+          SCRIPT=""
+          for candidate in lovejs/love.py lovejs/src/love.py lovejs/build.py; do
+            if [ -f "$candidate" ]; then
+              SCRIPT="$candidate"
+              break
+            fi
+          done
+          if [ -z "$SCRIPT" ]; then
+            echo "ERROR: love.js build script not found. Contents:"
+            find lovejs/ -name "*.py" | head -20
+            exit 1
+          fi
+          echo "Using: $SCRIPT"
+          python3 "$SCRIPT" \
+            "game.love" \
+            "web-build" \
             --title "${{ env.GAME_NAME }}" \
-            --memory 268435456    # 256 MB; увеличь до 536870912 (512 MB) если нужно
+            --memory 268435456
 
       # ── 7. Проверяем результат ─────────────────────────────────────
       - name: Verify build output
@@ -82,37 +93,3 @@ jobs:
           name: ${{ env.GAME_NAME }}-web
           path: web-build/
           retention-days: 30
-
-  # ── Опциональный деплой на GitHub Pages ───────────────────────────
-  deploy-pages:
-    needs: build-web
-    runs-on: ubuntu-latest
-    # Деплоим только при пуше в основную ветку (не при PR)
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-
-    permissions:
-      pages: write
-      id-token: write
-
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    steps:
-      - name: Download web build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ env.GAME_NAME }}-web
-          path: web-build/
-
-      - name: Setup GitHub Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload to Pages
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: web-build/
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
