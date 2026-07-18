@@ -60,19 +60,19 @@ jobs:
             --memory 268435456    # 256 MB; увеличь до 536870912 (512 MB) если нужно
 
       # ── 7. Проверяем результат ─────────────────────────────────────
-      # love.js кладёт в <output> папки debug/ и release/, а не index.html напрямую
+      # На практике love.js кладёт файлы прямо в <output>, без debug/release
       - name: Verify build output
         run: |
           echo "=== web-build contents ==="
           ls -lh web-build/
-          test -f web-build/release/index.html || (echo "ERROR: release/index.html not found!" && exit 1)
+          test -f web-build/index.html || (echo "ERROR: index.html not found!" && exit 1)
 
       # ── 8. Загружаем артефакт ──────────────────────────────────────
       - name: Upload web build artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.GAME_NAME }}-web
-          path: web-build/release/
+          path: web-build/
           retention-days: 30
 
   # ── Опциональный деплой на GitHub Pages ───────────────────────────
@@ -96,7 +96,6 @@ jobs:
         with:
           name: ${{ env.GAME_NAME }}-web
           path: web-build/
-      # ↑ артефакт уже содержит только содержимое web-build/release/ (см. джобу build-web)
 
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v5
