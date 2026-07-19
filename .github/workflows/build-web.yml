@@ -45,7 +45,7 @@ jobs:
         run: |
           love.js "game.love" "web-build" \
             --title "${{ env.GAME_NAME }}" \
-            --memory 536870912 \
+            --memory 268435456 \
             --compatibility
 
       # ── 6. Проверяем результат ─────────────────────────────────────
