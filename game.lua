@@ -126,11 +126,25 @@ function Game:start_up()
     --Load all shaders from resources
     self.SHADERS = {}
     local shader_files = love.filesystem.getDirectoryItems("resources/shaders")
+    local fs_files = {}
     for k, filename in ipairs(shader_files) do
-        local extension = string.sub(filename, -3)
-        if extension == '.fs' then
-            local shader_name = string.sub(filename, 1, -4)
-            self.SHADERS[shader_name] = love.graphics.newShader("resources/shaders/"..filename)
+        if string.sub(filename, -3) == '.fs' then fs_files[#fs_files+1] = filename end
+    end
+    for k, filename in ipairs(fs_files) do
+        local shader_name = string.sub(filename, 1, -4)
+        -- Give visible per-shader progress (0.4 -> 0.7) instead of one long
+        -- silent freeze; also catch WebGL compile failures instead of hanging
+        -- on a shader that never finishes/aborts silently in WASM.
+        boot_timer('shaders', 'compiling '..shader_name, 0.4 + 0.3*((k-1)/#fs_files))
+        local ok, shader_or_err = pcall(love.graphics.newShader, "resources/shaders/"..filename)
+        if ok then
+            self.SHADERS[shader_name] = shader_or_err
+        else
+            -- Surface this as a real Lua error so it shows on the visible
+            -- error screen with the shader name attached, instead of
+            -- silently freezing or crashing later with a confusing
+            -- "attempt to call a nil value" somewhere else in the game.
+            error('Shader "'..shader_name..'" failed to compile:\n'..tostring(shader_or_err))
         end
     end
 
