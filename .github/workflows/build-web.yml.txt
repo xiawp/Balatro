@@ -1,0 +1,64 @@
+name: Build Web
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build-web:
+    runs-on: ubuntu-latest
+
+    env:
+      GAME_NAME: "Balatro"
+
+    steps:
+      # ── 1. Исходники ───────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Node.js ──────────────────────────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # ── 3. Устанавливаем love.js (готовый npm-пакет, без Emscripten) ─
+      - name: Install love.js
+        run: npm install -g love.js
+
+      # ── 4. Упаковываем игру в .love-архив ─────────────────────────
+      - name: Package game as .love
+        run: |
+          zip -9 -r "game.love" . \
+            --exclude ".git/*" \
+            --exclude ".github/*" \
+            --exclude "*.love"
+          echo "game.love size: $(du -sh game.love | cut -f1)"
+
+      # ── 5. Собираем веб-билд через love.js ────────────────────────
+      # -c = compatibility mode: без потоков/SharedArrayBuffer.
+      # Это то, что нам и нужно — в исходниках потоки уже отключены для web.
+      - name: Build web with love.js
+        run: |
+          love.js "game.love" "web-build" \
+            --title "${{ env.GAME_NAME }}" \
+            --memory 268435456 \
+            --compatibility
+
+      # ── 6. Проверяем результат ─────────────────────────────────────
+      - name: Verify build output
+        run: |
+          echo "=== web-build contents ==="
+          ls -lh web-build/
+          test -f web-build/index.html || (echo "ERROR: index.html not found!" && exit 1)
+
+      # ── 7. Загружаем артефакт ──────────────────────────────────────
+      - name: Upload web build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.GAME_NAME }}-web
+          path: web-build/
+          retention-days: 30
