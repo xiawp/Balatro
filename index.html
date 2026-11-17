@@ -113,10 +113,10 @@
       }
     };
 
-    drawLoadingText('Загрузка…');
-    Module.setStatus('Загрузка…');
+    drawLoadingText('Loading...');
+    Module.setStatus('Loading...');
     window.onerror = function () {
-      Module.setStatus('Ошибка запуска — см. консоль браузера');
+      Module.setStatus('Run error see in browser console');
       Module.setStatus = function (text) {
         if (text) Module.printErr('[post-exception status] ' + text);
       };
