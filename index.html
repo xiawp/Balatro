@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#000000">
+  <title>Balatro</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+    }
+    body { position: fixed; inset: 0; }
+    canvas {
+      display: block;
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      border: 0;
+      padding: 0;
+      margin: 0;
+      touch-action: none;
+    }
+    #canvas { visibility: hidden; }
+    #loadingCanvas { visibility: visible; }
+  </style>
+</head>
+<body>
+  <canvas id="loadingCanvas" width="800" height="600"></canvas>
+  <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+
+  <script>
+    var loadingContext = document.getElementById('loadingCanvas').getContext('2d');
+
+    function drawLoadingText(text) {
+      var canvas = loadingContext.canvas;
+      var width = window.innerWidth;
+      var height = window.innerHeight;
+      if (canvas.width !== width) canvas.width = width;
+      if (canvas.height !== height) canvas.height = height;
+      loadingContext.fillStyle = '#000';
+      loadingContext.fillRect(0, 0, width, height);
+      loadingContext.fillStyle = '#fff';
+      loadingContext.font = '20px Arial, sans-serif';
+      loadingContext.textAlign = 'center';
+      loadingContext.textBaseline = 'middle';
+      loadingContext.fillText(text || 'Загрузка…', width / 2, height / 2);
+    }
+
+    window.addEventListener('resize', function () {
+      if (document.getElementById('loadingCanvas').style.display !== 'none') {
+        drawLoadingText('Загрузка…');
+      }
+    });
+
+    // Resume Web Audio on user gestures; no visible audio button is needed.
+    function resumeLoveAudio() {
+      var audioContext = (typeof Module !== 'undefined' && Module.SDL2)
+        ? Module.SDL2.audioContext
+        : null;
+      if (audioContext && audioContext.state === 'suspended') {
+        var result = audioContext.resume();
+        if (result && typeof result.catch === 'function') {
+          result.catch(function (error) {
+            console.warn('Unable to resume Web Audio:', error);
+          });
+        }
+      }
+    }
+
+    ['pointerdown', 'mousedown', 'touchstart', 'keydown', 'click'].forEach(function (eventName) {
+      window.addEventListener(eventName, resumeLoveAudio, { capture: true, passive: true });
+    });
+
+    window.addEventListener('keydown', function (event) {
+      if ([32, 37, 38, 39, 40].indexOf(event.keyCode) > -1) {
+        event.preventDefault();
+      }
+    }, false);
+
+    var Module = {
+      arguments: ['./game.love'],
+      INITIAL_MEMORY: 268435456,
+      printErr: console.error.bind(console),
+      canvas: (function () {
+        var canvas = document.getElementById('canvas');
+        canvas.addEventListener('webglcontextlost', function (event) {
+          event.preventDefault();
+          alert('WebGL context lost. Reload the page to continue.');
+        }, false);
+        return canvas;
+      })(),
+      setStatus: function (text) {
+        if (text) {
+          drawLoadingText(text);
+        } else if (Module.remainingDependencies === 0) {
+          document.getElementById('loadingCanvas').style.display = 'none';
+          document.getElementById('canvas').style.visibility = 'visible';
+        }
+      },
+      totalDependencies: 0,
+      remainingDependencies: 0,
+      monitorRunDependencies: function (left) {
+        this.remainingDependencies = left;
+        this.totalDependencies = Math.max(this.totalDependencies, left);
+        Module.setStatus(left ? 'Загрузка…' : '');
+      }
+    };
+
+    drawLoadingText('Загрузка…');
+    Module.setStatus('Загрузка…');
+    window.onerror = function () {
+      Module.setStatus('Ошибка запуска — см. консоль браузера');
+      Module.setStatus = function (text) {
+        if (text) Module.printErr('[post-exception status] ' + text);
+      };
+    };
+
+    var applicationLoad = function () {
+      Love(Module);
+    };
+  </script>
+  <script src="game.js"></script>
+  <script async src="love.js" onload="applicationLoad()"></script>
+</body>
+</html>
